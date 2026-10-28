@@ -1,0 +1,5 @@
+--- a/xrdpapi.c
++++ b/xrdpapi.c
+@@ -215 +215 @@
+-    if (!can_recv(wts->fd, 500))
++    if (!can_recv(wts->fd, 15000))
