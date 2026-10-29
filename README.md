@@ -30,43 +30,176 @@ prototypes or investigation logs. Migration alone is not a new hardware test.
 - A Windows RDP client supporting and permitting WebAuthn redirection.
   The original working path used stock `mstsc.exe`.
 - A supported authenticator connected to the Windows client.
-- Python 3 and the dependencies in `requirements.txt`; the original environment
-  used Python 3.12.
-- For the diagnostic probe or optional local API build: a C11 compiler, make,
-  and xrdp libraries. The local API build also requires curl and patch.
+- For the prebuilt `.deb`: **Ubuntu 24.04 amd64 with xrdp 0.9.24**, permission to
+  install packages with sudo, and access to Ubuntu repositories for dependencies.
+- For source development only: Python 3 and the dependencies in
+  `requirements.txt`, a C11 compiler, make, and xrdp libraries. The local API
+  build also requires curl and patch; JavaScript tests require GJS.
 
 The helper currently targets the xrdp **0.9.24 ABI**, the x86-64 library path
 `/usr/lib/x86_64-linux-gnu/xrdp/libxrdpapi.so`, and negotiated WebAuthn **API 9**.
 It is not a general xrdp-version or CPU-architecture adapter.
+In particular, xrdp 0.10.x is not currently supported by this package.
 
-## Install a released helper
+## Install the latest built artifacts
 
-The GitHub release workflow builds an extension ZIP and a `.deb` for
-**Ubuntu 24.04 amd64 with xrdp 0.9.24**. Download them from
-[Releases](https://github.com/Inkering/edge-to-rdp-webauthn-redirect/releases).
-Releases begin as drafts pending manual hardware verification.
+These instructions run on the **Linux desktop**, not Windows. No Git checkout,
+compiler, pip, or virtual environment is needed. CI builds are experimental
+snapshots; a green build verifies automated checks, not the real RDP/key path.
 
-On the supported Linux desktop:
+### 1. Download a matching extension and helper
+
+Open [Actions: Build and release](https://github.com/Inkering/edge-to-rdp-webauthn-redirect/actions/workflows/release.yml).
+Choose the **most recent successful push build for `main`**, not a pull-request
+build. On its summary page, download the **`release-ubuntu-24.04-amd64`**
+artifact. Downloading Actions artifacts requires signing in to GitHub; these
+artifacts expire after 14 days. If none are available, a maintainer needs to
+run a new build.
+
+Extract the downloaded artifact into a new directory. It contains:
+
+```text
+edge-to-rdp-webauthn-redirect-VERSION.zip
+edge-to-rdp-webauthn-redirect_VERSION-1_amd64.deb
+SHA256SUMS
+```
+
+Keep all three files from the **same build** together. The outer Actions
+artifact ZIP is not the extension ZIP.
+
+When a published release is available, you can instead download these same
+three files from [Releases](https://github.com/Inkering/edge-to-rdp-webauthn-redirect/releases),
+including a published prerelease if appropriate. Draft releases are not
+public downloads. Do not select GitHub's automatic "Source code" archives.
+
+### 2. Enable Windows WebAuthn redirection
+
+On Windows, add this setting to the `.rdp` file used by `mstsc.exe`:
+
+```text
+redirectwebauthn:i:1
+```
+
+Disconnect/reconnect using that file before continuing. Windows and
+organization policy must also permit WebAuthn redirection; this setting
+cannot override an administrative deny. The security key stays connected to
+the Windows client.
+
+### 3. Verify and install the helper
+
+In a Linux terminal, change into the directory containing the three extracted
+files, then run:
 
 ```sh
-sudo apt install ./edge-to-rdp-webauthn-redirect_0.1.1-1_amd64.deb
+sha256sum -c SHA256SUMS &&
+sudo apt update &&
+sudo apt install ./edge-to-rdp-webauthn-redirect_*_amd64.deb
 ```
+
+Both checksum checks must report `OK`; stop if they do not. Use a directory
+containing only one build so the filename wildcard selects one `.deb`.
+Checksums detect corruption or mismatched files, not independent publisher
+authenticity. Do not force installation if apt reports incompatible dependencies.
 
 The package installs Python dependencies through apt and includes a private
 timeout-patched xrdp API library; it does not replace system libraries.
-No checkout or `.venv` is required. Extract the extension ZIP to a persistent
-directory and load it unpacked as described below. Then run, **as your normal
-user inside the intended xrdp desktop**:
+An apt `N: ... unsandboxed as root ... _apt ... Permission denied` notice can
+occur when the download directory is inaccessible to `_apt`; that notice
+alone does not mean installation failed. Confirm with
+`dpkg-query -W -f='${Status}\n' edge-to-rdp-webauthn-redirect`, which should
+print `install ok installed`. Do not loosen your home-directory permissions.
+
+### 4. Load the extension in Linux Edge
+
+Disable any previous copy in `edge://extensions` before switching builds.
+Extract the **inner extension ZIP** to a persistent user-owned directory:
+
+```sh
+mkdir -p "$HOME/.local/share/edge-to-rdp-webauthn-redirect"
+unzip edge-to-rdp-webauthn-redirect-*.zip \
+  -d "$HOME/.local/share/edge-to-rdp-webauthn-redirect"
+```
+
+For an update in the same directory, allow unzip to replace the old extension
+files. Keep the directory at the same path after installation.
+
+#### Load the unpacked extension
+
+In **Edge inside the Linux xrdp desktop**, not Edge on Windows:
+
+1. Type `edge://extensions` into the address bar and press Enter.
+2. Turn on **Developer mode** on the extensions page. This reveals developer
+   controls such as **Load unpacked**. If your organization disables them,
+   ask your administrator; do not bypass its policy.
+3. Click **Load unpacked**. In the directory picker, choose
+   `/home/YOUR_LINUX_USER/.local/share/edge-to-rdp-webauthn-redirect`
+   (substitute your actual home directory). You can print the exact path with
+   `printf '%s\n' "$HOME/.local/share/edge-to-rdp-webauthn-redirect"`.
+   If hidden directories are not shown, enter the full path in the picker's
+   location field; many Linux file pickers open that field with Ctrl+L.
+4. Select the **directory that directly contains `manifest.json` and
+   `worker.js`**, then confirm the folder selection. Do not select the
+   download directory, the outer artifact directory, or either ZIP file.
+5. Confirm that a **Linux Edge to RDP WebAuthn Redirect** card appears.
+   The helper is not connected yet; register its ID in the next step.
+
+For a source checkout, select its `extension` directory instead. When updating
+an already loaded unpacked extension at the same path, replace the extracted
+files and click **Reload** on its existing card instead of adding another copy.
+
+#### Find and copy the extension ID
+
+Keep **Developer mode** enabled at `edge://extensions`. On the
+**Linux Edge to RDP WebAuthn Redirect** card, find **ID** and copy its value.
+If the card does not show it, open **Details** for that extension and look
+for its ID there. The ID is **32 lowercase letters in the range `a` through
+`p`**; it is not the extension name, version, or native-host name
+`org.local.xrdp_webauthn`.
+
+Use the ID shown by **your installed copy**, not another user's ID or an
+example from a guide. Keep it handy for `edge-rdp-webauthn-setup` below.
+If you change the unpacked location, profile, or later switch to a store
+installation, check the ID again and rerun setup if it changes.
+
+This unpacked installation is not a signed CRX or automatic-update channel.
+
+### 5. Register this desktop and connect
+
+Run these commands **inside the intended xrdp desktop as your normal user,
+without sudo**:
 
 ```sh
 rdpewa-probe 25
 edge-rdp-webauthn-setup YOUR_32_CHARACTER_EXTENSION_ID
 ```
 
-Enable Windows WebAuthn redirection as described below before probing.
-Package installation intentionally does not register any user's desktop.
-See [GitHub releases](publishing/github-releases.md) for checksums, installation,
-removal, and the maintainer's tag-to-draft-release process.
+Replace the placeholder with the ID copied from Edge. The probe must succeed
+with WebAuthn API version **9** before proceeding; `25` is its total deadline
+in seconds. It only checks the channel/version, without creating credentials
+or requesting a security-key PIN.
+
+Reload the extension in `edge://extensions`, then click its toolbar button
+if needed. The badge should become **`ON`** after helper readiness and proxy
+attachment. Package installation intentionally does not register any user's
+desktop. Rerun setup when the extension ID or desktop socket identity changes,
+including when replacing a previous source-based helper registration.
+
+### 6. Try an authentication
+
+In Linux Edge, sign in to a non-critical account that already has a passkey on
+the Windows-connected key, keeping another sign-in/recovery method available.
+Expect the authentication prompt on Windows. Enter any PIN **only in the
+Windows authentication dialog**, then touch the key when requested.
+
+`ON` and a successful probe are not proof of a successful authentication.
+If it fails, note the badge state, website error, and whether a Windows prompt
+appeared. Do not share PINs or authentication payloads. Disconnect or disable
+the extension to stop redirection.
+
+For controlled registration/assertion verification using a source checkout,
+see [Verify an actual authentication](#verify-an-actual-authentication).
+For package upgrades/removal and maintainer release instructions, see
+[GitHub releases](publishing/github-releases.md).
 
 ## Set up the Linux helper from source
 
@@ -128,8 +261,10 @@ library directory only; the Python helper retains its library selection above.
 ## Install the extension
 
 Until a store release is available, open `edge://extensions` in **Linux Edge**,
-enable Developer mode, and load this checkout's `extension` directory as an
-unpacked extension. Organizational policy must permit this.
+enable Developer mode, and load either this checkout's `extension` directory
+or the extracted extension ZIP directory as an unpacked extension.
+Organizational policy must permit this. Prebuilt-download users can follow
+the [installation quickstart](#install-the-latest-built-artifacts) above.
 
 Copy the displayed extension ID and register the native helper. For the `.deb`:
 
@@ -236,6 +371,12 @@ See the [publishing checklist](publishing/edge-addons.md) and
 [privacy policy](PRIVACY.md). Report issues through the
 [public issue tracker](https://github.com/Inkering/edge-to-rdp-webauthn-redirect/issues)
 without including authentication data or unredacted logs.
+
+## Contributing
+
+Bug reports, documentation improvements, focused fixes, and compatibility
+testing are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for development
+setup, test commands, pull-request expectations, and safe reporting guidance.
 
 ## Privacy and removal
 
