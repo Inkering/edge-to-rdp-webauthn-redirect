@@ -37,11 +37,11 @@ def main():
     args = parser.parse_args()
     if not re.fullmatch("[a-p]{32}", args.extension_id):
         parser.error("extension ID must contain exactly 32 letters in a..p")
+    if os.getuid() == 0:
+        sys.exit("Run this installer as the desktop user, without sudo")
     if os.environ.get("XRDP_SESSION") != "1" or not os.environ.get("DISPLAY"):
         sys.exit("Run this installer inside the intended xrdp desktop")
     root = Path(__file__).resolve().parent
-    if not (root / ".venv/bin/python").exists():
-        sys.exit("First create .venv and install requirements.txt")
     profile = args.edge_user_data_dir.expanduser().absolute()
     profile.mkdir(parents=True, exist_ok=True, mode=0o700)
     metadata = profile.lstat()
@@ -68,7 +68,7 @@ def main():
     launcher = directory / "native-host"
     write_private(launcher,
         "#!/bin/sh\nexec " + " ".join(shlex.quote(str(path)) for path in (
-            root / ".venv/bin/python", root / "native_host.py", config
+            Path(sys.executable), root / "native_host.py", config
         )) + ' "$@"\n', mode=0o700
     )
     manifest = manifest_dir / "org.local.xrdp_webauthn.json"
@@ -77,8 +77,8 @@ def main():
         "path": str(launcher), "type": "stdio", "allowed_origins": [origin],
     }, indent=2) + "\n")
     print(f"Installed {manifest}; bound to this user, extension and DISPLAY.")
-    print("Reconnect the extension using its toolbar button. Keep this source "
-          "directory and .venv in place.")
+    print("Reconnect the extension using its toolbar button. Keep the helper "
+          "and its Python environment installed at their current paths.")
 
 
 if __name__ == "__main__":

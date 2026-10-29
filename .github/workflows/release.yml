@@ -1,0 +1,114 @@
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Ubuntu 24.04 amd64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential debhelper dpkg-dev curl patch gjs xrdp \
+            python3 python3-cbor2 python3-cryptography
+
+      - name: Check release versions
+        id: version
+        run: |
+          version=$(/usr/bin/python3 -c 'import json; print(json.load(open("extension/manifest.json"))["version"])')
+          deb_version=$(dpkg-parsechangelog --show-field Version)
+          if [[ "$deb_version" != "$version-1" ]]; then
+            echo "::error::Debian changelog version must be $version-1, found $deb_version"
+            exit 1
+          fi
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::Release tag must be v$version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build and test the helper package
+        run: dpkg-buildpackage --build=binary --no-sign
+
+      - name: Collect release artifacts
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p build/release
+          cp "../edge-to-rdp-webauthn-redirect_${VERSION}-1_amd64.deb" build/release/
+          /usr/bin/python3 tools/package_extension.py --output-dir build/release
+          cd build/release
+          sha256sum -- *.deb *.zip > SHA256SUMS
+
+      - name: Check package installation and removal
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          test ! -e "$HOME/.local/lib/linux-rdpewa/session.json"
+          sudo apt-get install -y --no-install-recommends \
+            "./build/release/edge-to-rdp-webauthn-redirect_${VERSION}-1_amd64.deb"
+          /usr/bin/python3 -I tools/check_installed_helper.py
+          test ! -e "$HOME/.local/lib/linux-rdpewa/session.json"
+          test ! -e "$HOME/.config/microsoft-edge/NativeMessagingHosts/org.local.xrdp_webauthn.json"
+          sudo apt-get purge -y edge-to-rdp-webauthn-redirect
+          test ! -e /usr/bin/edge-rdp-webauthn-setup
+          test ! -e /usr/bin/rdpewa-probe
+          test ! -e /usr/lib/edge-to-rdp-webauthn-redirect/native_host.py
+          test ! -e /usr/lib/edge-to-rdp-webauthn-redirect/libxrdpapi.so
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-ubuntu-24.04-amd64
+          path: build/release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Draft prerelease
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-ubuntu-24.04-amd64
+          path: artifacts
+
+      - name: Create a draft prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" artifacts/* \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --draft --prerelease \
+            --title "Linux Edge to RDP WebAuthn Redirect $GITHUB_REF_NAME" \
+            --notes "Experimental preview for Ubuntu 24.04 amd64 with xrdp 0.9.24.
+
+          Assets: extension-only ZIP, Linux helper .deb, and SHA256SUMS.
+          The helper includes a private timeout-patched xrdp API library.
+          Run edge-rdp-webauthn-setup as your normal user inside the xrdp desktop.
+          Extract the extension ZIP and load it unpacked in Linux Edge; it is not a signed CRX.
+
+          This draft requires manual verification of these exact artifacts with
+          Windows RDP and a real authenticator before publication.
+          See the README and publishing/github-releases.md for setup and limitations."

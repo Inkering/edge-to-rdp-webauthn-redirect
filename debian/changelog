@@ -1,0 +1,6 @@
+edge-to-rdp-webauthn-redirect (0.1.1-1) noble; urgency=medium
+
+  * Package the native helper and private timeout-patched xrdp 0.9.24 API.
+  * Keep native messaging registration a separate per-user desktop operation.
+
+ -- Inkering <4595970+Inkering@users.noreply.github.com>  Thu, 29 Oct 2026 12:57:11 -0700

@@ -16,9 +16,14 @@ import uuid
 import cbor2
 
 
-LOCAL_LIBRARY = Path(__file__).resolve().parent / "build/local-api/libxrdpapi.so"
-LIBRARY = (str(LOCAL_LIBRARY) if LOCAL_LIBRARY.exists()
-           else "/usr/lib/x86_64-linux-gnu/xrdp/libxrdpapi.so")
+def library_path(root):
+    for path in (root / "libxrdpapi.so", root / "build/local-api/libxrdpapi.so"):
+        if path.exists():
+            return str(path)
+    return "/usr/lib/x86_64-linux-gnu/xrdp/libxrdpapi.so"
+
+
+LIBRARY = library_path(Path(__file__).resolve().parent)
 # chansrv has a 32 KiB API receive buffer and fragments DVC messages itself.
 MAX_REQUEST = 16 * 1024
 MAX_RESPONSE = 1024 * 1024

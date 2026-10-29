@@ -1,0 +1,7 @@
+* text=auto
+*.py text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+Makefile text eol=lf
+debian/rules text eol=lf
+debian/edge-rdp-webauthn-setup text eol=lf

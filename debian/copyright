@@ -1,0 +1,42 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Linux Edge to RDP WebAuthn Redirect
+Source: https://github.com/Inkering/edge-to-rdp-webauthn-redirect
+
+Files: *
+Copyright: 2026 Dieter Brehm
+License: MIT
+
+Files: build/xrdpapi-src/* build/local-api/xrdpapi.c
+Copyright: 2012-2013 Jay Sorg
+           2012-2013 Laxmikant Rashinkar
+           xrdp contributors (individual source notices included in the package)
+License: Apache-2.0
+Comment: Sources are fetched from xrdp commit
+ 85c863dba6b2e4863b8760475c8faa7f1b169fdd.
+ The channel-open acknowledgement timeout is changed from 500 to 15000 ms.
+ Source notices and the upstream license are included under
+ /usr/share/doc/edge-to-rdp-webauthn-redirect/xrdpapi/.
+
+License: MIT
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+ .
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+ .
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+
+License: Apache-2.0
+ On Debian/Ubuntu systems, the full license text is available at
+ /usr/share/common-licenses/Apache-2.0. The upstream copy is also included
+ under this package's xrdpapi documentation directory.

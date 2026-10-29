@@ -1,0 +1,44 @@
+#!/usr/bin/make -f
+
+export DEB_BUILD_MAINT_OPTIONS = hardening=+all
+export DPKG_EXPORT_BUILDFLAGS = 1
+include /usr/share/dpkg/default.mk
+
+PACKAGE = edge-to-rdp-webauthn-redirect
+LIBDIR = /usr/lib/$(PACKAGE)
+STAGE = debian/$(PACKAGE)
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	test "$$(. /etc/os-release; printf '%s:%s' "$$ID" "$$VERSION_ID")" = ubuntu:24.04
+	test "$(DEB_HOST_ARCH)" = amd64
+
+override_dh_auto_build:
+	$(MAKE) local-api CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)"
+	$(MAKE) all CFLAGS="$(CFLAGS)" CPPFLAGS="$(CPPFLAGS)" LDFLAGS="$(LDFLAGS)" PROBE_RPATH="$(LIBDIR)"
+
+override_dh_auto_test:
+	LD_LIBRARY_PATH="$(CURDIR)/build/local-api" $(MAKE) test PYTHON=/usr/bin/python3
+
+override_dh_auto_install:
+	install -d "$(STAGE)$(LIBDIR)" "$(STAGE)/usr/bin"
+	install -m 644 native_host.py rdpewa.py webauthn.py install_native.py "$(STAGE)$(LIBDIR)/"
+	install -m 644 build/local-api/libxrdpapi.so "$(STAGE)$(LIBDIR)/"
+	ln -s libxrdpapi.so "$(STAGE)$(LIBDIR)/libxrdpapi.so.0"
+	install -m 755 build/rdpewa-probe "$(STAGE)/usr/bin/"
+	install -m 755 debian/edge-rdp-webauthn-setup "$(STAGE)/usr/bin/"
+	install -d "$(STAGE)/usr/share/doc/$(PACKAGE)/xrdpapi"
+	cp -R build/xrdpapi-src/. "$(STAGE)/usr/share/doc/$(PACKAGE)/xrdpapi/"
+	rm -f "$(STAGE)/usr/share/doc/$(PACKAGE)/xrdpapi/.ready"
+	install -m 644 patches/xrdpapi-open-timeout.patch "$(STAGE)/usr/share/doc/$(PACKAGE)/xrdpapi/"
+
+override_dh_makeshlibs:
+	dh_makeshlibs -Xlibxrdpapi
+
+override_dh_shlibdeps:
+	dh_shlibdeps -l$(CURDIR)/$(STAGE)$(LIBDIR) -l/usr/lib/$(DEB_HOST_MULTIARCH)/xrdp -- --ignore-missing-info
+
+override_dh_strip:
+	dh_strip --no-automatic-dbgsym

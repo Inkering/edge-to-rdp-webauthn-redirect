@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /usr/bin/python3 /usr/lib/edge-to-rdp-webauthn-redirect/install_native.py "$@"

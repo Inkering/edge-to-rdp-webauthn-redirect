@@ -39,7 +39,36 @@ The helper currently targets the xrdp **0.9.24 ABI**, the x86-64 library path
 `/usr/lib/x86_64-linux-gnu/xrdp/libxrdpapi.so`, and negotiated WebAuthn **API 9**.
 It is not a general xrdp-version or CPU-architecture adapter.
 
-## Set up the Linux helper
+## Install a released helper
+
+The GitHub release workflow builds an extension ZIP and a `.deb` for
+**Ubuntu 24.04 amd64 with xrdp 0.9.24**. Download them from
+[Releases](https://github.com/Inkering/edge-to-rdp-webauthn-redirect/releases).
+Releases begin as drafts pending manual hardware verification.
+
+On the supported Linux desktop:
+
+```sh
+sudo apt install ./edge-to-rdp-webauthn-redirect_0.1.1-1_amd64.deb
+```
+
+The package installs Python dependencies through apt and includes a private
+timeout-patched xrdp API library; it does not replace system libraries.
+No checkout or `.venv` is required. Extract the extension ZIP to a persistent
+directory and load it unpacked as described below. Then run, **as your normal
+user inside the intended xrdp desktop**:
+
+```sh
+rdpewa-probe 25
+edge-rdp-webauthn-setup YOUR_32_CHARACTER_EXTENSION_ID
+```
+
+Enable Windows WebAuthn redirection as described below before probing.
+Package installation intentionally does not register any user's desktop.
+See [GitHub releases](publishing/github-releases.md) for checksums, installation,
+removal, and the maintainer's tag-to-draft-release process.
+
+## Set up the Linux helper from source
 
 Run the following commands **on Linux, inside the intended xrdp desktop**,
 as the desktop user, without sudo. Keep the checkout in a directory writable
@@ -102,7 +131,13 @@ Until a store release is available, open `edge://extensions` in **Linux Edge**,
 enable Developer mode, and load this checkout's `extension` directory as an
 unpacked extension. Organizational policy must permit this.
 
-Copy the displayed extension ID and register the native helper:
+Copy the displayed extension ID and register the native helper. For the `.deb`:
+
+```sh
+edge-rdp-webauthn-setup YOUR_32_CHARACTER_EXTENSION_ID
+```
+
+For a source checkout:
 
 ```sh
 .venv/bin/python install_native.py YOUR_32_CHARACTER_EXTENSION_ID
@@ -140,7 +175,8 @@ native-host identifier and helper directory are intentionally unchanged.
 The helper binds one exact extension origin, user, desktop and xrdp socket
 identity. Reinstall after a recreated desktop socket or changed extension ID.
 Alternate Edge installations share the same per-user helper binding.
-Keep this checkout and its `.venv` at their installed paths.
+For a source installation, keep this checkout and its `.venv` at their
+installed paths. For a packaged installation, keep the helper package installed.
 
 ## Verify an actual authentication
 
@@ -193,6 +229,9 @@ service worker, and extension icons are included. Users must install the
 Linux helper separately. Packaging does not sign, publish, or submit anything.
 `make extension-icons` regenerates the committed original artwork with GJS/Cairo.
 
+The [GitHub release workflow](publishing/github-releases.md) builds and checks
+both the ZIP and Ubuntu `.deb`; a `vVERSION` tag creates a draft prerelease.
+
 See the [publishing checklist](publishing/edge-addons.md) and
 [privacy policy](PRIVACY.md). Report issues through the
 [public issue tracker](https://github.com/Inkering/edge-to-rdp-webauthn-redirect/issues)
@@ -207,7 +246,9 @@ and Windows client; see [PRIVACY.md](PRIVACY.md) for details.
 
 Disconnect or disable the extension to stop redirection. Uninstalling it does
 not remove the separate helper, its configuration, or credentials on a key.
-After disabling it, remove the native-host manifest from each Edge user-data
+Remove the packaged helper with `sudo apt remove edge-to-rdp-webauthn-redirect`.
+Package removal/purge intentionally leaves per-user registrations alone.
+After disabling the extension, remove the native-host manifest from each Edge user-data
 root where you installed it and the two files in `~/.local/lib/linux-rdpewa`
 listed above if you no longer use this helper.
 

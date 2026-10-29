@@ -1,0 +1,32 @@
+Source: edge-to-rdp-webauthn-redirect
+Section: utils
+Priority: optional
+Maintainer: Inkering <4595970+Inkering@users.noreply.github.com>
+Build-Depends: debhelper-compat (= 13),
+ build-essential,
+ curl,
+ patch,
+ python3 (>= 3.12),
+ python3-cbor2 (>= 5.6),
+ python3-cryptography (>= 41.0.7),
+ gjs,
+ xrdp (>= 0.9.24),
+ xrdp (<< 0.9.25~)
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://github.com/Inkering/edge-to-rdp-webauthn-redirect
+
+Package: edge-to-rdp-webauthn-redirect
+Architecture: amd64
+Depends: ${misc:Depends}, ${shlibs:Depends},
+ python3 (>= 3.12),
+ python3-cbor2 (>= 5.6),
+ python3-cryptography (>= 41.0.7),
+ xrdp (>= 0.9.24),
+ xrdp (<< 0.9.25~)
+Description: Linux Edge native helper for RDP WebAuthn redirection
+ Experimental native messaging helper and diagnostic probe for Microsoft Edge
+ inside an xrdp desktop. Targets Ubuntu 24.04 amd64 and xrdp 0.9.24.
+ Includes a private timeout-patched xrdp API library, not a system replacement.
+ The browser extension is installed separately. Each desktop user must run
+ edge-rdp-webauthn-setup inside their xrdp session after package installation.

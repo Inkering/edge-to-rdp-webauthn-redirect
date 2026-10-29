@@ -4,6 +4,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shlex
 import signal
 import struct
 import subprocess
@@ -20,10 +21,13 @@ from hardware_test import verify_assertion
 from install_native import main as install_native, write_private
 from native_host import Host, check_config, encode_message
 from rdpewa import (
-    BridgeError, Channel, MAX_REQUEST, decode_one, rpc, start, unwrap, worker_diagnostic,
+    BridgeError, Channel, MAX_REQUEST, decode_one, library_path, rpc, start, unwrap, worker_diagnostic,
 )
 from rp_server import RelyingParty
 from webauthn import RequestError, auth_data, b64, complete, prepare, unb64
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def options(kind="get"):
@@ -273,6 +277,25 @@ class WebAuthnTests(unittest.TestCase):
 
 
 class NativeTests(unittest.TestCase):
+    def test_library_selection_prefers_package_then_local_build(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(library_path(root),
+                             "/usr/lib/x86_64-linux-gnu/xrdp/libxrdpapi.so")
+            local = root / "build/local-api/libxrdpapi.so"
+            local.parent.mkdir(parents=True)
+            local.touch()
+            self.assertEqual(library_path(root), str(local))
+            packaged = root / "libxrdpapi.so"
+            packaged.touch()
+            self.assertEqual(library_path(root), str(packaged))
+
+    def test_registration_rejects_root(self):
+        with patch("install_native.os.getuid", return_value=0), \
+                patch("install_native.sys.argv", ["install_native.py", "a" * 32]), \
+                self.assertRaisesRegex(SystemExit, "without sudo"):
+            install_native()
+
     def test_browser_fixture_is_explicitly_opt_in_and_synthetic(self):
         fixture = Path(__file__).with_name("browser_native_fixture.py")
         environment = dict(os.environ)
@@ -305,7 +328,7 @@ class NativeTests(unittest.TestCase):
             profile = home / "isolated-edge"
             extension_id = "a" * 32
             with patch("install_native.Path.home", return_value=home), \
-                    patch("install_native.Path.exists", return_value=True), \
+                    patch("install_native.sys.executable", "/test python/bin/python"), \
                     patch("install_native.session_socket", return_value=[1, 2]), \
                     patch("install_native.os.umask"), \
                     patch.dict(os.environ, DISPLAY=":10.0", XRDP_SESSION="1"), \
@@ -324,6 +347,9 @@ class NativeTests(unittest.TestCase):
             self.assertFalse((home / ".config/microsoft-edge").exists())
             launcher = home / ".local/lib/linux-rdpewa/native-host"
             self.assertEqual(launcher.stat().st_mode & 0o777, 0o700)
+            command = shlex.split(launcher.read_text().splitlines()[1])
+            self.assertEqual(command[:2], ["exec", "/test python/bin/python"])
+            self.assertIn(str(ROOT / "native_host.py"), command)
             config = launcher.with_name("session.json")
             with patch("native_host.session_socket", return_value=[1, 2]), \
                     patch.dict(os.environ, DISPLAY=":10.0", XRDP_SESSION="1"):
@@ -353,7 +379,6 @@ class NativeTests(unittest.TestCase):
                     (profile / "NativeMessagingHosts").symlink_to(
                         target, target_is_directory=True)
                 with patch("install_native.Path.home", return_value=home), \
-                        patch("install_native.Path.exists", return_value=True), \
                         patch("install_native.os.umask"), \
                         patch.dict(os.environ, DISPLAY=":10.0", XRDP_SESSION="1"), \
                         patch("install_native.sys.argv", [

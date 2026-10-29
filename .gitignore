@@ -3,3 +3,8 @@ __pycache__/
 /.venv/
 *.pem
 *.crx
+/debian/.debhelper/
+/debian/edge-to-rdp-webauthn-redirect/
+/debian/files
+/debian/*.debhelper
+/debian/*.substvars
